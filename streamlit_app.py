@@ -1,112 +1,96 @@
 import streamlit as st
+import joblib
 import pandas as pd
-import numpy as np
-import plotly.express as px
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import LabelEncoder
 
-st.title("Machine Learning App")
-st.info("This app will predict your obesity level!")
+model = joblib.load('trained_model.pkl')
+loaded_encoder = joblib.load('encoder.pkl')
+loaded_scaler = joblib.load('scaler.pkl')
 
-data = pd.read_csv("ObesityDataSet_raw_and_data_sinthetic.csv") 
-df = pd.DataFrame(data)
+def input_to_df(input):
+  data = [input]
+  df = pd.DataFrame(data, columns = ['Gender', 'Age', 'Height', 'Weight', 'family_history_with_overweight', 'FAVC', 'FCVC', 'NCP', 'CAEC', 'SMOKE', 'CH2O', 'SCC', 'FAF', 'TUE', 'CALC', 'MTRANS'])
+  return df
 
-# Expander to show raw data
-with st.expander("Data"):
-    st.write("This is a raw data")
-    st.dataframe(df)
+def encode(df):
+  for column in df.columns:
+    if df[column].dtype == "object":
+      df[column] = loaded_encoder.fit_transform(df[column])
+  return df
 
-#Data Visualilzation
-category_mapping = {
-    "Insufficient_Weight": "blue",
-    "Normal_Weight": "green",
-    "Overweight_Level_I": "yellow",
-    "Overweight_Level_II": "orange",
-    "Obesity_Type_I": "red",
-    "Obesity_Type_II": "purple"
-}
+def normalize(df):
+  df = loaded_scaler.transform(df)
+  return df
 
+def predict_with_model(model, user_input):
+  prediction = model.predict(user_input)
+  return prediction[0]
 
-with st.expander("Data Visualization"):
-    fig = px.scatter(df, x="Height", y="Weight", color="NObeyesdad",
-                 color_discrete_map=category_mapping,
-                 title="Data Visualization",
-                 labels={"Height": "Height (m)", "Weight": "Weight (kg)"})
+def main():
+  st.title('Machine Learning App')
+  
+  st.info('This app will predict your obesity level!')
+  
+  # Raw Data
+  with st.expander('**Data**'):
+    st.write('This is a raw data')
+    df = pd.read_csv('https://raw.githubusercontent.com/JeffreyJuinior/dp-machinelearning/refs/heads/master/ObesityDataSet_raw_and_data_sinthetic.csv')
+    df
+    st.write('**X**')
+    X = df.drop('NObeyesdad',axis=1)
+    X
+    st.write('**y**')
+    y = df['NObeyesdad']
+    y
+  
+  # Visualization
+  with st.expander('**Data Visualization**'):
+    st.scatter_chart(data=df, x = 'Height', y = 'Weight', color='NObeyesdad')
+  
+  # Input Data bu User
+  Age = st.slider('Age', min_value = 14, max_value = 61, value = 24)
+  Height = st.slider('Height', min_value = 1.45, max_value = 1.98, value = 1.7)
+  Weight = st.slider('Weight', min_value = 39, max_value = 173, value = 86)
+  FCVC = st.slider('FCVC', min_value = 1, max_value = 3, value = 2)
+  NCP = st.slider('NCP', min_value = 1, max_value = 4, value = 3)
+  CH2O = st.slider('CH2O', min_value = 1, max_value = 3, value = 2)
+  FAF = st.slider('FAF', min_value = 0, max_value = 3, value = 1)
+  TUE = st.slider('TUE', min_value = 0, max_value = 2, value = 1)
+  
+  Gender = st.selectbox('Gender', ('Male', 'Female'))
+  family_history_with_overweight = st.selectbox('Family history with overweight', ('yes', 'no'))
+  FAVC = st.selectbox('FAVC', ('yes', 'no'))
+  CAEC = st.selectbox('CAEC', ('Sometimes', 'Frequently', 'Always', 'no'))
+  SMOKE = st.selectbox('SMOKE', ('yes', 'no'))
+  SCC = st.selectbox('SCC', ('yes', 'no'))
+  CALC = st.selectbox('CALC', ('Sometimes', 'no', 'Frequently', 'Always'))
+  MTRANS = st.selectbox('MTRANS', ('Public_Transportation', 'Automobile', 'Walking', 'Motorbike', 'Bike'))
 
-    st.plotly_chart(fig)
+  # Input Data for Program
+  user_input = [Gender, Age, Height, Weight, family_history_with_overweight, FAVC, FCVC, NCP, CAEC, SMOKE, CH2O, SCC, FAF, TUE, CALC, MTRANS]
+  df = input_to_df(user_input)
 
+  st.write('Data input by user')
+  df
 
-def train_model():
-    # Dummy data training (harus diganti dengan dataset asli)
-    data = pd.DataFrame({
-        "Gender": np.random.choice(["Male", "Female"], 100),
-        "Age": np.random.randint(10, 80, 100),
-        "Height": np.random.uniform(1.2, 2.2, 100),
-        "Weight": np.random.randint(30, 200, 100),
-        "family_history_with_overweight": np.random.choice(["yes", "no"], 100),
-        "FAVC": np.random.choice(["yes", "no"], 100),
-        "FCVC": np.random.randint(1, 4, 100),
-        "NCP": np.random.randint(1, 5, 100),
-        "CAEC": np.random.choice(["Sometimes", "Frequently", "Always", "No"], 100),
-        "Obesity": np.random.choice(["Insufficient Weight", "Normal Weight", "Overweight Level I", "Overweight Level II", "Obesity Type I", "Obesity Type II"], 100)
-    })
-    
-    # Label encoding
-    label_encoders = {}
-    for col in ["Gender", "family_history_with_overweight", "FAVC", "CAEC"]:
-        le = LabelEncoder()
-        data[col] = le.fit_transform(data[col])
-        label_encoders[col] = le
-    
-    X = data.drop("Obesity", axis=1)
-    y = LabelEncoder().fit_transform(data["Obesity"])
-    
-    model = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
-    model.fit(X, y)
-    
-    return model, label_encoders
+  df = encode(df)
+  df = normalize(df)
+  prediction = predict_with_model(model, df)
+  
+  prediction_proba = model.predict_proba(df)
+  df_prediction_proba = pd.DataFrame(prediction_proba)
+  df_prediction_proba.columns = ['Insufficient Weight', 'Normal Weight', 'Overweight Level I', 'Overweight Level II', 'Obesity Type I', 'Obesity Type II', 'Obesity Type III']
+  df_prediction_proba.rename(columns={0: 'Insufficient Weight', 
+                                      1:'Normal Weight', 
+                                      2: 'Overweight Level I', 
+                                      3: 'Overweight Level II', 
+                                      4:'Obesity Type I', 
+                                      5:'Obesity Type II', 
+                                      6: 'Obesity Type III'})
 
-# Load model
-model, encoders = train_model()
+  st.write('Obesity Prediction')
+  df_prediction_proba
+  st.write('The predicted output is: ',prediction) 
+  
 
-# **Judul Aplikasi**
-st.title("Obesity Prediction App")
-
-# **Input Data Pengguna**
-st.header("Input Data")
-gender = st.selectbox("Gender", ["Male", "Female"])
-age = st.slider("Age", 10, 80, 1)
-height = st.slider("Height (m)", 1.2, 2.2, 1.2)
-weight = st.slider("Weight (kg)", 30, 200, 30)
-family_history = st.selectbox("Family History of Overweight", ["yes", "no"])
-favc = st.selectbox("Frequent Consumption of High Caloric Food", ["yes", "no"])
-fcvc = st.slider("Frequency of Vegetable Consumption", 1, 3, 1)
-ncp = st.slider("Number of Main Meals", 1, 4, 1)
-caec = st.selectbox("Consumption of Food Between Meals", ["Sometimes", "Frequently", "Always", "No"])
-
-# **Menampilkan Data yang Diinputkan**
-input_data = pd.DataFrame([{ 
-    "Gender": encoders["Gender"].transform([gender])[0], 
-    "Age": age, "Height": height, "Weight": weight,
-    "family_history_with_overweight": encoders["family_history_with_overweight"].transform([family_history])[0],
-    "FAVC": encoders["FAVC"].transform([favc])[0],
-    "FCVC": fcvc, "NCP": ncp, "CAEC": encoders["CAEC"].transform([caec])[0]
-}])
-
-st.write("Data input by user")
-st.dataframe(input_data)
-
-# **Prediksi Model**
-# Mendapatkan probabilitas prediksi untuk setiap kelas
-probabilities = model.predict_proba(input_data)
-
-# Mendapatkan probabilitas prediksi untuk setiap kelas
-probabilities = model.predict_proba(input_data)
-
-# Menampilkan probabilitas tiap kelas dalam dataframe
-st.write("Prediction Probabilities:")
-st.dataframe(pd.DataFrame(probabilities, columns=["Insufficient Weight", "Normal Weight", "Overweight Level I", "Overweight Level II", "Obesity Type I", "Obesity Type II"]))
-
-# Menampilkan hasil prediksi akhir
-predicted_class = np.argmax(probabilities)
-st.write("The predicted output is: ", predicted_class)
+if __name__ == "__main__":
+  main()
